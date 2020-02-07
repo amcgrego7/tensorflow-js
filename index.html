@@ -1,0 +1,407 @@
+<!--
+Copyright 2018 Google LLC. All Rights Reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+==============================================================================
+-->
+
+<html>
+
+<head>
+  <link rel="stylesheet" href="https://code.getmdl.io/1.3.0/material.cyan-teal.min.css" />
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootswatch/3.3.7/flatly/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.css">
+  <link rel="stylesheet" href="index.css" />
+
+  <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.5.16/dist/vue.js"></script>
+  <script src="https://cdn.rawgit.com/google/code-prettify/master/loader/run_prettify.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.10/lodash.min.js"></script>
+  <script src="index.js"></script>
+</head>
+
+<body>
+
+  <div id="app">
+    <div class="container">
+
+      <div class="col-lg-12">
+        <h1>An Introduction to Tensorflow.js</h1>
+        <p>Just a few months ago, Google launched Tensorflow.js. The JavaScript library is a cousin of the Python-based package.
+          But, it introduces many additional capabilities that come with using a browser-friendly programming language. I
+          plan to dive deeper into Tensorflow.js. Using the boston housing data set as an example, I'm setting out to provide
+          a comparison of the Python and JavaScript versions of Tensorflow and show some cool capabilities that come with
+          performing machine learning in the browser.
+        </p>
+
+      </div>
+
+      <div class="col-lg-12">
+        <h3>Boston Housing Data <i class="fa fa-link" href="boston_data.json"></i></h3>
+        <p>We're going to dive into some data that was captured in the mid-1970's. The data set has 13 columns that describe
+          the suburbs of Boston. The columns include things like the area's crime rate, proximity to jobs, and average number
+          of rooms per household. Using these 13 features, we're going to build a model to predict the median home price
+          of the area.</p>
+
+        <pre class="prettyprint lang-js">
+  // Get the data
+  const bostonData = require("./boston_data.json")
+
+  // Let's peek at the format of the data. Price is what we will be building our model to predict
+  console.log(bostonData)
+  // returns:
+  // [
+  //  {"crim":0.00632,"zn":18.0,"indus":2.31,"chas":0.0,"nox":0.538,"rm":6.575,"age":65.2,"dis":4.09,"rad":1.0, ..."price":24.0},
+  //  {"crim":0.02731,"zn":0.0,"indus":7.07,"chas":0.0,"nox":0.469,"rm":6.421,"age":78.9,"dis":4.9671,"rad":2.0 ... "price":21.6}
+  // ...
+  // ]</pre>
+      </div>
+
+      <div class="col-lg-12">
+        <h3>Exploratory Analysis</h3>
+        <p>Let's start by looking at each of the 13 features and their relationship with median home price. Notice any relationships?
+          Are the features discrete, continous or binary variables?
+        </p>
+        <carousel pagination-active-color="#00d1b2" :per-page-custom="[[768, 1], [1024, 3]]" :navigation-enabled="true">
+        <slides v-for="feature in features" v-bind:feature="feature"></slides>
+      </carousel>
+      </div>
+
+      <div class="col-lg-12">
+        <h3>Split, Train, Test</h3>
+
+        <p>An important aspect to building a model is to use a training set. Our model will learn how to predict 
+          the price of the Boston suburb based on the features in the training set. Once our model
+          has been developed, we will then pass the 'unseen' testing data into the model and examine the models
+          ability to predict using these new inputs. This helps us to assess if the model is too "overfit." 
+          
+          Follow the code below to see how the training and testing data is split.
+        </p>
+
+        <div class="col-sm-12 col-lg-7">
+        <pre class="prettyprint lang-js">
+  // These arrays will hold our model ready data
+  const trainingData = [];
+  const testingData = [];
+
+  // Define the size of the training set (e.g. 80%)
+  const splitSize = .8 * bostonData.length
+
+  // Use lodash.js to randomly shuffle the data, then chunk the
+  // data into two arrays
+  const shuffled = _.chunk(_.shuffle(bostonData), splitSize)
+  console.log(shuffled)
+  // returns: [Array(404), Array(102)]
+
+  // Pass the shuffled data to the trainingData and testingData
+  trainingData = shuffled[0]
+  testingData = shuffled[1]
+        </pre>        
+
+      </div>
+      <div class="col-lg-5"></div>
+        <label class="caption" style="margin-top:20px">Here's a breakdown of the number of records in our training and testing sets</label>
+        <div id="splitTrainBar"></div>
+      </div>
+
+      <div class="col-lg-12">
+        <h3>Normalize the Data</h3>
+
+        <p>At this point, it would be pretty easy to dive in and build our model. But, there's
+          an important step we should take to help our model learn efficiently. Normalization is especially
+          useful to apply to our data set because we have so many quanitative features with different scales. For example,
+          the feature per capita crime rate ranges from 0 to 90 and nitric oxide concentration ranges from .37 to .87.
+          Without applying normalization, our model would not only need to learn the relationship of each feature with the 
+          outcome variable, it would also need to account for the scale of each feature. By applying normalization, we can control
+          the scale, therefore reducing some computational power to building our model. More to come on that!
+        </p>
+
+        <p>So, how do we normalize the data? We'll need to convert each data point for a given feature to represent it's
+          standard deviation from the mean. Let's see a few data points after normalization, then show the code that produced
+          the normalized data. 
+        </p>
+
+
+        <div id="afterNormalization">
+            <v-client-table 
+              :data="trainingData.normalized.slice(0, 5)" 
+              :columns="features.map(function(obj) { return obj.abrev })" 
+              :options="{
+                filterable : false,
+                sortable : [],
+                texts : { count : '' },
+                columnsDisplay : { zn : 'desktop', chas : 'desktop', dis : 'desktop', b : 'desktop', lstat : 'desktop', crim : 'desktop', 
+                  ptratio : 'tabletL', nox : 'tabletL', rad : 'tabletL'}
+              }">
+            </v-client-table>
+        </div>
+      </div>
+
+      <div class="col-sm-12">
+        <h4>Normalization step one</h4>
+        <p>Calculate the mean and standard deviation for each feature</p>
+      </div>
+      <div class="col-lg-offset-1 col-lg-9">  
+        <pre class="prettyprint lang-js">
+
+  // Array will hold objects, where each object contains normalized values
+  const normTrainingData = [];
+
+  // Calcs will hold the mean and standard deviation for each feature
+  const calcs = {};
+
+  // Iterate through our 13 features + outcome variable
+  features.forEach(feature => {
+
+    // Work out the mean for each feature using lodash.js
+    const mean = _.meanBy(trainingData, function(record) { 
+      return record[feature.abrev]; 
+    });
+  
+    // For each value in data set, subtract the mean and square the result
+    const totalError = trainingData.reduce((accumulator, currentValue) =>  
+      accumulator + Math.pow((currentValue[feature.abrev]-mean), 2), 0
+    );
+    
+    // Calculate the square root of the mean squared error
+    const stdDev = Math.sqrt(totalError / trainingData.length)
+    
+    // Store the mean and standard deviation for each feature 
+    // using feature abreviation as key
+    calcs[feature.abrev] = {}
+    calcs[feature.abrev]['stdDev'] = stdDev;
+    calcs[feature.abrev]['mean'] = mean
+
+  }); 
+        </pre>
+      </div>
+  
+      <div class="col-lg-12">
+        <h4>Normalization step two</h4>
+        <p>Calculate and return the standard deviation of each value in the data</p>
+      </div>
+      <div class="col-lg-offset-1 col-lg-9">  
+        <pre class="prettyprint lang-js">
+  
+  // Loop through the training data again, this time calculating 
+  // (feature value - mean) / std) for each feature. Since 
+  // price is the outcome variable, we don't need to normalize it
+  trainingData.forEach(record => {
+
+    // Will hold the normalized values until we push them to the 
+    // normTrainingData array
+    const arr = [];
+
+    // Iterate through training data objects. Each property (i.e. 'key') 
+    // is either a feature or the outcome variable
+    Object.keys(record).forEach(key => {
+
+      // Checks if the property is price. 
+      if (key === "price") {
+
+        // Pass the value without making any adjustments
+        arr[key] = record[key] 
+
+      } else { 
+
+        // Normalize the value
+        arr[key] = ((record[key] - calcs[key].mean) / calcs[key].stdDev)
+      }
+    })
+
+    // viola!
+    normTrainingData.push(arr)
+  })
+        </pre>     
+      </div>
+
+      <div class="col-lg-12">
+        <h3>Build the Model</h3>
+        <h4>Neural Networks</h4>
+        <p>If you're new to neural networks, it might help you to watch this one minute explanation. Otherwise, press on to 
+          learn the Tensorflow API.
+        </p>
+
+        <iframe width="560" height="415" src="https://www.youtube.com/embed/rEDzUT3ymw4?rel=0&amp;showinfo=0" 
+          frameborder="0" allow="autoplay; encrypted-media" allowfullscreen>
+        </iframe>        
+        
+        <h4>Tensorflow's low-level and high-level APIs</h4>
+        <p>At this point, our data is all prepped and ready to be fed to a model. But, we haven't created our model yet! 
+          Within Tensorflow, there are two path's that we can follow to build a model. One path is called the low-level API, which allows
+          us to explicitly create each of building blocks for the machine learning algorithim. The other path is called the high-level API. 
+          This path allows us to use tensorflow's pre-defined, deep-learning algorithims. Using the high-level API, we still have the ability 
+          to customize the model's parameters, such as the layers or loss function, which I'll explain soon. 
+          For this demo, we will explore and apply the high-level API. 
+        </p>
+
+        <h4>Define the layers</h4>
+      
+        <p>The model that we are building will be a sequential model. This means that the outputs for one layer
+          will be the inputs to the layer. In the final output layer, there will be one continous value In our model, we are going to define each of the layers and use a 
+          Rectified Linear Unit activation function. 
+        </p>
+
+      </div>
+      <div class="col-lg-offset-1 col-lg-9">  
+        <pre class="prettyprint lang-js">
+
+  // Build a sequential model.
+  const model = tf.sequential();
+
+  // First layer that directly receives the training data
+  const hidden1 = tf.layers.dense({
+    units: 64, // Ask a phd about this value...
+    inputShape: [13], // We have 13 features
+    activation: 'relu' // Rectified Linear Unit (again, phd)
+  })
+  model.add(hidden1)
+
+  // Second layer that received hidden1 outputs
+  const hidden2 = tf.layers.dense({
+    units: 64,
+    activation: 'relu'
+  })
+  model.add(hidden2)
+
+  // Third and final layer that received hidden2 outputs
+  // Outputs of this layer will be one continous value
+  const output = tf.layers.dense({
+    units: 1,
+  })
+  model.add(output)
+        </pre>     
+      </div>
+
+      <div class="col-lg-12">
+        <h4>Choose a Loss Function and Optimizer</h4>
+        <p>With all machine learning algorithims, we must have a loss function. A loss function is what our model 
+          attempts to minimize as it assigns weights to each neuron in the model. Without the loss function, our model would not know what 
+          metric to assess itself against in order to learn the appropriate weights.
+        </p>
+        
+        <p>For our model, since the output will be a continous value, we can use the mean squared error (MSE) as our loss function. The 
+          MSE approach aims to minimize the squared error of the predicted housing price value against the actual housing price value. 
+          For our metrics, we'll also report the mean absolute error (MAE) since these values are easier to interpret.
+        </p>
+
+        <p>
+          The method for how the model arrives at the best solution is by applying an optimizer. There are a few that we could choose from,
+          but we'll use a the root mean square prop (RMSprop). RMSprop uses adaptive learning to speed up convergence.  
+        </p>
+
+      </div>
+      <div class="col-lg-offset-1 col-lg-9">  
+        <pre class="prettyprint lang-js">
+
+  // Compile all the layers and define model parameters
+  model.compile({
+    loss: 'meanSquaredError',
+    metrics: ['mae']
+    optimizer: tf.train.rmsprop(0.001), // .001 is the learning rate
+  });
+        </pre>     
+      </div>
+      <div class="col-lg-12">
+        <h4>Create the training function</h4>
+        <p>To train our model, we will execute Tensorsflow's model.fit() method. The important points here are</p>
+        <ul>
+          <li>Model.fit is asynchronous, so we must wrap it in an asynchronous function</li>
+          <li>We will pass the features (Xs) and outcomes (Ys) to the model</li>
+          <li>We will specify the "epoch" property in the configuration. One epoch consists of a forward and backward pass of all the training data. 
+            For our model, we'll keep it at 250</li>
+        </ul>
+      </div>
+
+      <div class="col-lg-offset-1 col-lg-9">  
+        <pre class="prettyprint lang-js">
+
+
+        async function train(xs, ys) {
+          const response = await model.fit(xs, ys, { epochs : 250 });
+        }
+
+        // To call the function we'll use this
+        train(xs, ys).then(() => {
+          response.history.mae.print()
+        })
+        </pre>     
+      </div>
+
+
+      <div class="col-lg-12">
+        <h4>Converting the data into tensors</h4>
+        <p>Last but not least, in order for the model to run, we must pass our data to it in 
+          the form of tensors. Tensors are matrices. While that might sound intimidating,
+          we don't need to know any matrices math in order to use them. We just need to know how 
+          our data is structured and what it's shape is when transformed into a tensor.
+        </p>
+        <p>Our data looks like this...</p>
+      </div>
+      <div class="col-lg-offset-1 col-lg-9">  
+          <pre class="prettyprint lang-js">
+  console.log(normTrainingData);
+  // returns
+  // [
+  //  0: { crim: "0.76", zn: "-0.49", indus: "1.04", chas: "-0.26", nox: "1.40", … }
+  //  1: { crim: "-0.42", zn: "-0.49", indus: "-1.23", chas: "-0.26", nox: "-0.58", … }
+  //  2: { crim: "0.11", zn: "-0.49", indus: "1.04", chas: "-0.26", nox: "0.23", … }
+  //  3: { crim: "-0.42", zn: "3.17", indus: "-0.99", chas: "-0.26", nox: "-1.10", … }
+  //  ...
+  // ]
+          </pre>     
+        </div>
+        <div class="col-lg-12">
+          <p>When I look at this array of objects, I recognize that in order to create a tensor for the features (Xs) 
+            and a tensor for outcome (Ys), I will need to transform the data into an array of arrays. Essentially,
+             this would be a 2D matrix. Let's do that now.</p>
+        </div>
+          
+        <div class="col-lg-offset-1 col-lg-9">  
+          <pre class="prettyprint lang-js">
+
+  // Iterate through the normalized training data
+  normTrainingData.forEach(obj => {
+
+    // Arrays to hold X and Y values respectively
+    const arrX = [];
+    const arrY = [];
+
+    // Get the value of the property and separate Xs and Ys
+    Object.keys(obj).forEach(key => {
+      key === "price" ? arrY.push(obj[key]) : arrX.push(obj[key])
+    })
+
+    xVals.push(arrX)
+    yVals.push(arrY)
+
+  })
+
+  // Convert array of arrays to 2d tensor
+  const xs = tf.tensor2d(xVals);
+  const ys = tf.tensor2d(yVals);
+        </pre>  
+      </div>
+
+      <div class="col-lg-12">
+        <i v-on:click="buildModel" class="fa fa-play-circle"></i>
+        <div id="modelSettings"></div>
+        <div id="lineChart"></div>
+      </div>
+
+    </div>
+  </div>
+</body>
+</html>
